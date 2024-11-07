@@ -1,43 +1,51 @@
 version: '3.8'
 services:
   php-apache-environment:
-      container_name: php-apache
-      build:
-        context: ./php
-        dockerfile: Dockerfile
-      depends_on:
-        - db
-      volumes:
-        - ./php/src:/var/www/html/
-      ports:
-        - 8000:80
-      networks:
-        - monitoring
+    container_name: php-apache
+    build:
+      context: ./php
+      dockerfile: Dockerfile
+    depends_on:
+      - db
+    volumes:
+      - ./php/src:/var/www/html/
+    ports:
+      - 8000:80
+    networks:
+      - monitoring
+    labels:
+      - "prometheus_scrape=true"
+  
   db:
-      container_name: db
-      image: mysql
-      restart: always
-      environment:
-        MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
-        MYSQL_DATABASE: almoxarifado
-      ports:
-        - "9906:3306"
-      volumes:
-        - ./php/db:/docker-entrypoint-initdb.d
-      networks:
-        - monitoring
+    container_name: db
+    image: mysql
+    restart: always
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: almoxarifado
+    ports:
+      - "9906:3306"
+    volumes:
+      - ./php/db:/docker-entrypoint-initdb.d
+    networks:
+      - monitoring
+    labels:
+      - "prometheus_scrape=false"  # Banco de dados não expõe métricas HTTP, então desabilitamos a coleta
+
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     ports:
       - '8080:80'
     restart: always
     environment:
-        PMA_HOST: db
+      PMA_HOST: db
     depends_on:
       - db
     networks:
       - monitoring
-  
+    labels:
+      - "prometheus_scrape=false"
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -47,6 +55,12 @@ services:
       - 9090:9090
     networks:
       - monitoring
+    depends_on:
+      - php-apache-environment
+      - db
+      - phpmyadmin
+    labels:
+      - "prometheus_scrape=true"
 
   grafana:
     image: grafana/grafana
